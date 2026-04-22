@@ -421,3 +421,5 @@
 
     if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
   
+    console.log('Afinador de Violão carregado. Permita o acesso ao microfone e toque uma corda para começar a afinar!');
+    
