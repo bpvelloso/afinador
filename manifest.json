@@ -2,7 +2,7 @@
   "name": "Afinador de Violão",
   "short_name": "Afinador",
   "description": "Afinador cromático para violão - Standard Tuning",
-  "start_url": "./index.html",
+  "start_url": "./",
   "display": "standalone",
   "background_color": "#07070d",
   "theme_color": "#0a0a0f",
