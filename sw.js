@@ -1,5 +1,10 @@
-const CACHE = 'afinador-v4';
-const ASSETS = ['./index.html', './styles.css', './app.js', './manifest.json'];
+const CACHE = 'afinador-v6';
+const ASSETS = ['./index.html', 
+                './styles.css', 
+                './app.js', 
+                './manifest.json',
+                './icons/icon-192.png',
+                './icons/icon-512.png'];
 
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(ASSETS)));

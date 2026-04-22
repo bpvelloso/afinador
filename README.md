@@ -1,8 +1,10 @@
 # 🎸 Afinador de Violão
 
-> Afinador cromático profissional para violão, direto no navegador — sem instalação, sem plugins.
+> Afinador cromático para violão, direto no navegador — sem instalação, sem plugins.
 
 **🌐 Acesse agora:** [https://bpvelloso.github.io/afinador/](https://bpvelloso.github.io/afinador/)
+
+Código inicial gerado no [claude](https://claude.ai/).
 
 ---
 
