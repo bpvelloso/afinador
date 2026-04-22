@@ -330,14 +330,12 @@
     // WAVEFORM — colorida pelo nível de RMS
     // ═══════════════════════════════════════════════════════════════
     function drawWaveform(buffer, rms) {
-      const W = canvas.offsetWidth  || canvas.parentElement.clientWidth;
-      const H = canvas.offsetHeight || canvas.parentElement.clientHeight;
-      if (canvas.width !== W * devicePixelRatio) resizeCanvas();
-
-      const cw = canvas.width, ch = canvas.height;
+      const cw = canvas.width;
+      const ch = canvas.height;
+      if (cw === 0 || ch === 0) return;
       ctx2d.clearRect(0, 0, cw, ch);
 
-      const intensity = Math.min(1, rms / 0.05); // normaliza brilho pelo volume
+      const intensity = Math.min(1, rms / 0.05);
       const alpha = 0.15 + intensity * 0.85;
 
       const grad = ctx2d.createLinearGradient(0, 0, cw, 0);
@@ -347,28 +345,32 @@
       grad.addColorStop(0.8, `rgba(200,169,110,${alpha * 0.6})`);
       grad.addColorStop(1,   `rgba(200,169,110,0)`);
 
-      const step = buffer.length / (cw / devicePixelRatio);
+      const step = buffer.length / cw;
       ctx2d.beginPath();
       ctx2d.strokeStyle = grad;
       ctx2d.lineWidth   = 1.5 * devicePixelRatio;
       ctx2d.lineCap     = 'round';
 
-      for (let px = 0; px < cw / devicePixelRatio; px++) {
+      for (let px = 0; px < cw; px++) {
         const v = buffer[Math.floor(px * step)] || 0;
-        const y = ((v * 0.9 + 1) / 2) * (ch / devicePixelRatio);
+        const y = ((v * 0.9 + 1) / 2) * ch;
         px === 0 ? ctx2d.moveTo(px, y) : ctx2d.lineTo(px, y);
       }
       ctx2d.stroke();
     }
 
     function resizeCanvas() {
-      const rect = canvas.parentElement.getBoundingClientRect();
-      canvas.width  = Math.round(rect.width  * devicePixelRatio);
-      canvas.height = Math.round(rect.height * devicePixelRatio);
-      canvas.style.width  = rect.width  + 'px';
-      canvas.style.height = rect.height + 'px';
+      const parent = canvas.parentElement;
+      canvas.style.width  = '';
+      canvas.style.height = '';
+      const w = parent.clientWidth;
+      const h = parent.clientHeight || 60;
+      canvas.width  = Math.round(w * devicePixelRatio);
+      canvas.height = Math.round(h * devicePixelRatio);
+      canvas.style.width  = w + 'px';
+      canvas.style.height = h + 'px';
     }
-    resizeCanvas();
+    requestAnimationFrame(() => requestAnimationFrame(resizeCanvas));
     window.addEventListener('resize', resizeCanvas);
 
     // ═══════════════════════════════════════════════════════════════
@@ -422,4 +424,3 @@
     if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
   
     console.log('Afinador de Violão carregado. Permita o acesso ao microfone e toque uma corda para começar a afinar!');
-    

@@ -1,8 +1,10 @@
 {
+  "$schema": "http://json.schemastore.org/web-manifest",
   "name": "Afinador de Violão",
   "short_name": "Afinador",
   "description": "Afinador cromático para violão - Standard Tuning",
-  "start_url": "./",
+  "scope": "./",
+  "start_url": "./index.html",
   "display": "standalone",
   "background_color": "#07070d",
   "theme_color": "#0a0a0f",
