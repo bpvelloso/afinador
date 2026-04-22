@@ -1,0 +1,874 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#0a0a0f" />
+  <meta name="description" content="Afinador de violão profissional - PWA" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Afinador" />
+  <link rel="manifest" href="manifest.json" />
+  <title>Afinador de Violão</title>
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=JetBrains+Mono:wght@300;400;700&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #07070d;
+      --surface: #0f0f1a;
+      --surface2: #161625;
+      --border: #1e1e35;
+      --accent: #c8a96e;
+      --accent2: #e8c98e;
+      --green: #4ade80;
+      --red: #f87171;
+      --yellow: #fbbf24;
+      --text: #e8e8f0;
+      --muted: #5a5a7a;
+      --glow: rgba(200,169,110,0.15);
+    }
+
+    html, body {
+      height: 100%;
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'JetBrains Mono', monospace;
+      overflow-x: hidden;
+    }
+
+    body {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      min-height: 100vh;
+      background:
+        radial-gradient(ellipse 80% 50% at 50% -10%, rgba(200,169,110,0.08) 0%, transparent 60%),
+        radial-gradient(ellipse 60% 40% at 80% 100%, rgba(100,80,180,0.06) 0%, transparent 60%),
+        var(--bg);
+    }
+
+    /* Grain overlay */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
+      pointer-events: none;
+      z-index: 0;
+      opacity: 0.6;
+    }
+
+    .app {
+      position: relative;
+      z-index: 1;
+      width: 100%;
+      max-width: 480px;
+      padding: 24px 16px 40px;
+      display: flex;
+      flex-direction: column;
+      gap: 24px;
+    }
+
+    /* HEADER */
+    header {
+      text-align: center;
+      padding: 8px 0 0;
+    }
+    header h1 {
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: clamp(2.8rem, 8vw, 4rem);
+      letter-spacing: 0.12em;
+      color: var(--accent);
+      line-height: 1;
+      text-shadow: 0 0 40px rgba(200,169,110,0.4);
+    }
+    header p {
+      font-size: 0.65rem;
+      letter-spacing: 0.3em;
+      color: var(--muted);
+      text-transform: uppercase;
+      margin-top: 4px;
+    }
+
+    /* MAIN DISPLAY */
+    .main-display {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 28px 24px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 16px;
+      position: relative;
+      overflow: hidden;
+    }
+    .main-display::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, var(--accent), transparent);
+      opacity: 0.5;
+    }
+
+    .note-display {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+    }
+    .note-name {
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 6rem;
+      line-height: 1;
+      color: var(--text);
+      transition: color 0.2s, text-shadow 0.2s;
+      letter-spacing: 0.05em;
+    }
+    .note-name.in-tune {
+      color: var(--green);
+      text-shadow: 0 0 40px rgba(74,222,128,0.5);
+    }
+    .note-name.sharp { color: var(--red); }
+    .note-name.flat { color: var(--yellow); }
+
+    .freq-display {
+      font-size: 0.7rem;
+      letter-spacing: 0.2em;
+      color: var(--muted);
+    }
+    .freq-display span { color: var(--accent); }
+
+    /* CENTS METER */
+    .meter-wrap {
+      width: 100%;
+    }
+    .meter-labels {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.55rem;
+      letter-spacing: 0.15em;
+      color: var(--muted);
+      margin-bottom: 6px;
+    }
+    .meter-track {
+      position: relative;
+      height: 8px;
+      background: var(--surface2);
+      border-radius: 4px;
+      overflow: visible;
+    }
+    .meter-center {
+      position: absolute;
+      left: 50%;
+      top: -4px;
+      width: 2px;
+      height: 16px;
+      background: var(--border);
+      transform: translateX(-50%);
+      z-index: 2;
+    }
+    .meter-fill {
+      position: absolute;
+      top: 0;
+      height: 100%;
+      border-radius: 4px;
+      transition: width 0.1s, left 0.1s, background 0.2s;
+      background: var(--accent);
+    }
+    .meter-needle {
+      position: absolute;
+      top: 50%;
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      background: var(--accent);
+      transform: translate(-50%, -50%);
+      transition: left 0.1s, background 0.2s;
+      z-index: 3;
+      box-shadow: 0 0 12px var(--accent);
+    }
+    .meter-needle.in-tune { background: var(--green); box-shadow: 0 0 16px var(--green); }
+    .meter-needle.sharp { background: var(--red); box-shadow: 0 0 12px var(--red); }
+    .meter-needle.flat { background: var(--yellow); box-shadow: 0 0 12px var(--yellow); }
+
+    .cents-value {
+      text-align: center;
+      font-size: 0.65rem;
+      margin-top: 8px;
+      letter-spacing: 0.15em;
+      color: var(--muted);
+      transition: color 0.2s;
+    }
+    .cents-value.in-tune { color: var(--green); }
+    .cents-value.sharp { color: var(--red); }
+    .cents-value.flat { color: var(--yellow); }
+
+    /* TUNING STATUS */
+    .status-badge {
+      padding: 5px 16px;
+      border-radius: 20px;
+      font-size: 0.6rem;
+      letter-spacing: 0.25em;
+      text-transform: uppercase;
+      border: 1px solid currentColor;
+      transition: all 0.2s;
+    }
+    .status-badge.idle { color: var(--muted); border-color: var(--border); }
+    .status-badge.listening { color: var(--accent); border-color: var(--accent); animation: pulse-border 1.5s ease-in-out infinite; }
+    .status-badge.in-tune { color: var(--green); border-color: var(--green); }
+    .status-badge.sharp { color: var(--red); border-color: var(--red); }
+    .status-badge.flat { color: var(--yellow); border-color: var(--yellow); }
+
+    @keyframes pulse-border {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.5; }
+    }
+
+    /* STRINGS PANEL */
+    .strings-label {
+      font-size: 0.6rem;
+      letter-spacing: 0.3em;
+      color: var(--muted);
+      text-transform: uppercase;
+      text-align: center;
+    }
+
+    .strings-grid {
+      display: grid;
+      grid-template-columns: repeat(6, 1fr);
+      gap: 8px;
+      width: 100%;
+    }
+
+    .string-btn {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 10px 6px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+      cursor: pointer;
+      transition: all 0.2s;
+      position: relative;
+      overflow: hidden;
+    }
+    .string-btn::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: radial-gradient(ellipse at 50% 0%, var(--accent), transparent 70%);
+      opacity: 0;
+      transition: opacity 0.2s;
+    }
+    .string-btn:hover::before,
+    .string-btn.active::before { opacity: 0.1; }
+    .string-btn.active {
+      border-color: var(--accent);
+      box-shadow: 0 0 16px rgba(200,169,110,0.2), inset 0 0 16px rgba(200,169,110,0.05);
+    }
+    .string-btn.in-tune {
+      border-color: var(--green);
+      box-shadow: 0 0 12px rgba(74,222,128,0.2);
+    }
+    .string-btn.in-tune::before {
+      background: radial-gradient(ellipse at 50% 0%, var(--green), transparent 70%);
+      opacity: 0.1;
+    }
+
+    .string-num {
+      font-size: 0.55rem;
+      color: var(--muted);
+      letter-spacing: 0.1em;
+    }
+    .string-note {
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 1.6rem;
+      line-height: 1;
+      color: var(--text);
+      letter-spacing: 0.05em;
+    }
+    .string-btn.active .string-note { color: var(--accent); }
+    .string-btn.in-tune .string-note { color: var(--green); }
+    .string-hz {
+      font-size: 0.5rem;
+      color: var(--muted);
+      letter-spacing: 0.05em;
+    }
+    .string-indicator {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--border);
+      transition: background 0.2s, box-shadow 0.2s;
+      margin-top: 2px;
+    }
+    .string-btn.active .string-indicator { background: var(--accent); box-shadow: 0 0 8px var(--accent); }
+    .string-btn.in-tune .string-indicator { background: var(--green); box-shadow: 0 0 8px var(--green); }
+
+    /* VISUALIZER */
+    .visualizer-wrap {
+      width: 100%;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      overflow: hidden;
+      height: 60px;
+      position: relative;
+    }
+    .visualizer-wrap canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+    }
+
+    /* MIC BUTTON */
+    .mic-btn {
+      width: 72px;
+      height: 72px;
+      border-radius: 50%;
+      border: 2px solid var(--accent);
+      background: transparent;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.2s;
+      position: relative;
+      align-self: center;
+    }
+    .mic-btn::before {
+      content: '';
+      position: absolute;
+      inset: -6px;
+      border-radius: 50%;
+      border: 1px solid var(--accent);
+      opacity: 0.3;
+      transition: all 0.2s;
+    }
+    .mic-btn.active {
+      background: var(--accent);
+      box-shadow: 0 0 30px rgba(200,169,110,0.5);
+    }
+    .mic-btn.active::before {
+      opacity: 0.6;
+      animation: ring-pulse 1.5s ease-out infinite;
+    }
+    .mic-btn svg { transition: stroke 0.2s; }
+    .mic-btn.active svg { stroke: var(--bg); }
+    .mic-btn:hover:not(.active) {
+      box-shadow: 0 0 20px rgba(200,169,110,0.3);
+      background: rgba(200,169,110,0.08);
+    }
+
+    @keyframes ring-pulse {
+      0% { transform: scale(1); opacity: 0.6; }
+      100% { transform: scale(1.4); opacity: 0; }
+    }
+
+    /* REFERENCE TONE */
+    .ref-section {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 14px 16px;
+    }
+    .ref-header {
+      font-size: 0.55rem;
+      letter-spacing: 0.3em;
+      color: var(--muted);
+      text-transform: uppercase;
+      margin-bottom: 10px;
+    }
+    .ref-buttons {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+    .ref-btn {
+      flex: 1;
+      min-width: 44px;
+      padding: 8px 4px;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--text);
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 1.1rem;
+      letter-spacing: 0.05em;
+      cursor: pointer;
+      transition: all 0.15s;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 1px;
+    }
+    .ref-btn span {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.5rem;
+      color: var(--muted);
+      letter-spacing: 0.05em;
+    }
+    .ref-btn:hover { border-color: var(--accent); color: var(--accent); }
+    .ref-btn.playing {
+      border-color: var(--accent);
+      background: rgba(200,169,110,0.1);
+      color: var(--accent);
+      box-shadow: 0 0 12px rgba(200,169,110,0.2);
+    }
+
+    /* FOOTER */
+    footer {
+      text-align: center;
+      font-size: 0.55rem;
+      letter-spacing: 0.2em;
+      color: var(--muted);
+      text-transform: uppercase;
+    }
+
+    /* Install banner */
+    #install-banner {
+      display: none;
+      background: var(--surface);
+      border: 1px solid var(--accent);
+      border-radius: 12px;
+      padding: 12px 16px;
+      font-size: 0.65rem;
+      letter-spacing: 0.1em;
+      color: var(--accent);
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    #install-banner:hover { background: rgba(200,169,110,0.1); }
+
+    .divider {
+      height: 1px;
+      background: linear-gradient(90deg, transparent, var(--border), transparent);
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <header>
+      <h1>AFINADOR</h1>
+      <p>Violão Acústico · Standard Tuning</p>
+    </header>
+
+    <div id="install-banner">⬇ Instalar como app</div>
+
+    <!-- MAIN DISPLAY -->
+    <div class="main-display">
+      <div class="note-display">
+        <div class="note-name" id="note-name">—</div>
+        <div class="freq-display">Detectado: <span id="freq-val">—</span> Hz</div>
+      </div>
+
+      <div class="meter-wrap">
+        <div class="meter-labels">
+          <span>-50¢</span>
+          <span>BEMOL</span>
+          <span>0</span>
+          <span>SUSTENIDO</span>
+          <span>+50¢</span>
+        </div>
+        <div class="meter-track" id="meter-track">
+          <div class="meter-center"></div>
+          <div class="meter-fill" id="meter-fill"></div>
+          <div class="meter-needle" id="meter-needle"></div>
+        </div>
+        <div class="cents-value" id="cents-val">— ¢</div>
+      </div>
+
+      <div class="status-badge idle" id="status-badge">Aguardando</div>
+    </div>
+
+    <!-- MIC BUTTON -->
+    <button class="mic-btn" id="mic-btn" aria-label="Ativar microfone">
+      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M12 2a3 3 0 0 1 3 3v7a3 3 0 0 1-6 0V5a3 3 0 0 1 3-3z"/>
+        <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+        <line x1="12" y1="19" x2="12" y2="23"/>
+        <line x1="8" y1="23" x2="16" y2="23"/>
+      </svg>
+    </button>
+
+    <!-- WAVEFORM VISUALIZER -->
+    <div class="visualizer-wrap">
+      <canvas id="visualizer"></canvas>
+    </div>
+
+    <div class="divider"></div>
+
+    <!-- STRINGS -->
+    <div class="strings-label">Cordas do Violão</div>
+    <div class="strings-grid" id="strings-grid"></div>
+
+    <div class="divider"></div>
+
+    <!-- REFERENCE TONES -->
+    <div class="ref-section">
+      <div class="ref-header">Tom de Referência</div>
+      <div class="ref-buttons" id="ref-buttons"></div>
+    </div>
+
+    <footer>Afinador Cromático · A4 = 440 Hz</footer>
+  </div>
+
+  <script>
+    // ─── STRING DATA ──────────────────────────────────────────────
+    const STRINGS = [
+      { label: '6ª', note: 'E2', freq: 82.41,  num: 6 },
+      { label: '5ª', note: 'A2', freq: 110.00, num: 5 },
+      { label: '4ª', note: 'D3', freq: 146.83, num: 4 },
+      { label: '3ª', note: 'G3', freq: 196.00, num: 3 },
+      { label: '2ª', note: 'B3', freq: 246.94, num: 2 },
+      { label: '1ª', note: 'E4', freq: 329.63, num: 1 },
+    ];
+
+    const NOTE_NAMES = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
+    const A4 = 440;
+    const IN_TUNE_THRESHOLD = 5; // cents
+
+    // ─── STATE ────────────────────────────────────────────────────
+    let audioCtx = null;
+    let analyser = null;
+    let source = null;
+    let rafId = null;
+    let isListening = false;
+    let activeStringIndex = -1;
+    let refOscillator = null;
+    let refGain = null;
+    let playingRefIndex = -1;
+
+    // ─── DOM REFS ─────────────────────────────────────────────────
+    const noteName   = document.getElementById('note-name');
+    const freqVal    = document.getElementById('freq-val');
+    const centsVal   = document.getElementById('cents-val');
+    const meterFill  = document.getElementById('meter-fill');
+    const meterNeedle= document.getElementById('meter-needle');
+    const statusBadge= document.getElementById('status-badge');
+    const micBtn     = document.getElementById('mic-btn');
+    const stringsGrid= document.getElementById('strings-grid');
+    const refButtons = document.getElementById('ref-buttons');
+    const canvas     = document.getElementById('visualizer');
+    const ctx2d      = canvas.getContext('2d');
+
+    // ─── BUILD STRINGS ────────────────────────────────────────────
+    STRINGS.forEach((s, i) => {
+      const btn = document.createElement('button');
+      btn.className = 'string-btn';
+      btn.innerHTML = `
+        <div class="string-num">${s.label}</div>
+        <div class="string-note">${s.note.replace(/\d/,'')}</div>
+        <div class="string-hz">${s.freq.toFixed(1)}Hz</div>
+        <div class="string-indicator"></div>
+      `;
+      btn.addEventListener('click', () => selectString(i));
+      stringsGrid.appendChild(btn);
+    });
+
+    // ─── BUILD REFERENCE BUTTONS ──────────────────────────────────
+    STRINGS.forEach((s, i) => {
+      const btn = document.createElement('button');
+      btn.className = 'ref-btn';
+      btn.innerHTML = `${s.note.replace(/\d/,'')}<span>${s.freq.toFixed(1)}Hz</span>`;
+      btn.addEventListener('click', () => playReference(i, btn));
+      refButtons.appendChild(btn);
+    });
+
+    function selectString(i) {
+      activeStringIndex = i;
+      document.querySelectorAll('.string-btn').forEach((b, j) => {
+        b.classList.toggle('active', j === i);
+        if (j !== i) b.classList.remove('in-tune');
+      });
+    }
+
+    // ─── AUDIO INIT ───────────────────────────────────────────────
+    async function startListening() {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false }, video: false });
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        analyser = audioCtx.createAnalyser();
+        analyser.fftSize = 8192;
+        analyser.smoothingTimeConstant = 0.85;
+        source = audioCtx.createMediaStreamSource(stream);
+        source.connect(analyser);
+        isListening = true;
+        micBtn.classList.add('active');
+        setStatus('listening', 'Ouvindo...');
+        loop();
+      } catch(e) {
+        setStatus('idle', 'Acesso negado');
+        alert('Permita o acesso ao microfone para usar o afinador.');
+      }
+    }
+
+    function stopListening() {
+      if (rafId) cancelAnimationFrame(rafId);
+      if (source) source.disconnect();
+      if (audioCtx) audioCtx.close();
+      audioCtx = analyser = source = null;
+      isListening = false;
+      micBtn.classList.remove('active');
+      setStatus('idle', 'Aguardando');
+      resetDisplay();
+    }
+
+    micBtn.addEventListener('click', () => {
+      if (isListening) stopListening();
+      else startListening();
+    });
+
+    // ─── PITCH DETECTION (YIN-like autocorrelation) ───────────────
+    function detectPitch(buffer, sampleRate) {
+      const SIZE = buffer.length;
+      const MAX_SAMPLES = Math.floor(SIZE / 2);
+      let bestOffset = -1, bestCorr = 0, foundGoodCorr = false;
+      let lastCorr = 1;
+
+      const corr = new Float32Array(MAX_SAMPLES);
+      for (let offset = 0; offset < MAX_SAMPLES; offset++) {
+        let corr2 = 0;
+        for (let i = 0; i < MAX_SAMPLES; i++) corr2 += buffer[i] * buffer[i + offset];
+        corr[offset] = corr2;
+      }
+
+      for (let offset = 1; offset < MAX_SAMPLES; offset++) {
+        if (corr[offset] > 0.9 && corr[offset] > lastCorr) {
+          foundGoodCorr = true;
+          if (corr[offset] > bestCorr) { bestCorr = corr[offset]; bestOffset = offset; }
+        } else if (foundGoodCorr) break;
+        lastCorr = corr[offset];
+      }
+
+      if (bestOffset === -1 || bestCorr < 0.01) return null;
+
+      // Parabolic interpolation
+      const x1 = corr[bestOffset - 1], x2 = corr[bestOffset], x3 = corr[bestOffset + 1] || 0;
+      const a = (x1 + x3 - 2 * x2) / 2;
+      const b = (x3 - x1) / 2;
+      const refined = a !== 0 ? bestOffset - b / (2 * a) : bestOffset;
+
+      return sampleRate / refined;
+    }
+
+    // ─── FREQUENCY → NOTE ─────────────────────────────────────────
+    function freqToNote(freq) {
+      const semitones = 12 * Math.log2(freq / A4);
+      const midi = Math.round(semitones) + 69;
+      const cents = Math.round((semitones - Math.round(semitones)) * 100);
+      const noteName = NOTE_NAMES[((midi % 12) + 12) % 12];
+      const octave = Math.floor(midi / 12) - 1;
+      return { name: noteName, octave, cents, midi };
+    }
+
+    // ─── CLOSEST STRING ───────────────────────────────────────────
+    function closestString(freq) {
+      let best = 0, bestDiff = Infinity;
+      STRINGS.forEach((s, i) => {
+        const diff = Math.abs(1200 * Math.log2(freq / s.freq));
+        if (diff < bestDiff) { bestDiff = diff; best = i; }
+      });
+      return best;
+    }
+
+    // ─── MAIN LOOP ────────────────────────────────────────────────
+    function loop() {
+      rafId = requestAnimationFrame(loop);
+      const bufLen = analyser.fftSize;
+      const buffer = new Float32Array(bufLen);
+      analyser.getFloatTimeDomainData(buffer);
+
+      // RMS check
+      let rms = 0;
+      for (let i = 0; i < bufLen; i++) rms += buffer[i] * buffer[i];
+      rms = Math.sqrt(rms / bufLen);
+
+      drawWaveform(buffer);
+
+      if (rms < 0.01) {
+        setStatus('listening', 'Ouvindo...');
+        resetDisplay(false);
+        return;
+      }
+
+      const freq = detectPitch(buffer, audioCtx.sampleRate);
+      if (!freq || freq < 60 || freq > 1200) return;
+
+      const note = freqToNote(freq);
+      const strIdx = closestString(freq);
+      const targetFreq = STRINGS[strIdx].freq;
+      const centsOff = Math.round(1200 * Math.log2(freq / targetFreq));
+
+      updateDisplay(note, freq, centsOff, strIdx);
+    }
+
+    // ─── UPDATE DISPLAY ───────────────────────────────────────────
+    function updateDisplay(note, freq, cents, strIdx) {
+      const inTune = Math.abs(cents) <= IN_TUNE_THRESHOLD;
+      const sharp  = cents > IN_TUNE_THRESHOLD;
+      const flat   = cents < -IN_TUNE_THRESHOLD;
+      const cls    = inTune ? 'in-tune' : sharp ? 'sharp' : 'flat';
+
+      noteName.textContent = note.name + note.octave;
+      noteName.className   = 'note-name ' + cls;
+      freqVal.textContent  = freq.toFixed(1);
+      centsVal.textContent = (cents >= 0 ? '+' : '') + cents + ' ¢';
+      centsVal.className   = 'cents-value ' + cls;
+      meterNeedle.className= 'meter-needle ' + cls;
+
+      // Needle position (clamp -50 to +50)
+      const clamped = Math.max(-50, Math.min(50, cents));
+      const pct = (clamped + 50) / 100; // 0..1
+      meterNeedle.style.left = (pct * 100) + '%';
+
+      // Fill bar
+      const mid = 50;
+      if (inTune) {
+        meterFill.style.left = '48%';
+        meterFill.style.width = '4%';
+        meterFill.style.background = 'var(--green)';
+      } else if (sharp) {
+        meterFill.style.left = '50%';
+        meterFill.style.width = ((pct - 0.5) * 100) + '%';
+        meterFill.style.background = 'var(--red)';
+      } else {
+        meterFill.style.left = (pct * 100) + '%';
+        meterFill.style.width = ((0.5 - pct) * 100) + '%';
+        meterFill.style.background = 'var(--yellow)';
+      }
+
+      // Status
+      if (inTune) setStatus('in-tune', 'Afinado ✓');
+      else if (sharp) setStatus('sharp', 'Sustenido ↑');
+      else setStatus('flat', 'Bemol ↓');
+
+      // Highlight detected string
+      if (activeStringIndex === -1 || activeStringIndex !== strIdx) selectString(strIdx);
+      document.querySelectorAll('.string-btn')[strIdx].classList.toggle('in-tune', inTune);
+    }
+
+    function resetDisplay(full = true) {
+      if (full) {
+        noteName.textContent = '—';
+        noteName.className = 'note-name';
+        freqVal.textContent = '—';
+      }
+      centsVal.textContent = '— ¢';
+      centsVal.className = 'cents-value';
+      meterNeedle.style.left = '50%';
+      meterNeedle.className = 'meter-needle';
+      meterFill.style.width = '0%';
+    }
+
+    function setStatus(type, text) {
+      statusBadge.className = 'status-badge ' + type;
+      statusBadge.textContent = text;
+    }
+
+    // ─── WAVEFORM ─────────────────────────────────────────────────
+    function drawWaveform(buffer) {
+      const W = canvas.width, H = canvas.height;
+      ctx2d.clearRect(0, 0, W, H);
+      ctx2d.fillStyle = 'transparent';
+
+      const step = Math.ceil(buffer.length / W);
+      const grad = ctx2d.createLinearGradient(0, 0, W, 0);
+      grad.addColorStop(0, 'rgba(200,169,110,0.1)');
+      grad.addColorStop(0.5, 'rgba(200,169,110,0.8)');
+      grad.addColorStop(1, 'rgba(200,169,110,0.1)');
+
+      ctx2d.beginPath();
+      ctx2d.strokeStyle = grad;
+      ctx2d.lineWidth = 1.5;
+      ctx2d.lineCap = 'round';
+
+      for (let i = 0; i < W; i++) {
+        const v = buffer[i * step] || 0;
+        const y = (v * 0.9 + 1) / 2 * H;
+        if (i === 0) ctx2d.moveTo(i, y);
+        else ctx2d.lineTo(i, y);
+      }
+      ctx2d.stroke();
+    }
+
+    // Resize canvas
+    function resizeCanvas() {
+      const rect = canvas.parentElement.getBoundingClientRect();
+      canvas.width  = rect.width  * devicePixelRatio;
+      canvas.height = rect.height * devicePixelRatio;
+      canvas.style.width  = rect.width + 'px';
+      canvas.style.height = rect.height + 'px';
+      ctx2d.scale(devicePixelRatio, devicePixelRatio);
+    }
+    resizeCanvas();
+    window.addEventListener('resize', resizeCanvas);
+
+    // ─── REFERENCE TONE ───────────────────────────────────────────
+    function playReference(i, btn) {
+      if (playingRefIndex === i) {
+        stopReference();
+        return;
+      }
+      stopReference();
+
+      const refCtx = new (window.AudioContext || window.webkitAudioContext)();
+      refOscillator = refCtx.createOscillator();
+      refGain = refCtx.createGain();
+      refOscillator.type = 'triangle';
+      refOscillator.frequency.value = STRINGS[i].freq;
+      refGain.gain.setValueAtTime(0, refCtx.currentTime);
+      refGain.gain.linearRampToValueAtTime(0.3, refCtx.currentTime + 0.1);
+      refGain.gain.linearRampToValueAtTime(0, refCtx.currentTime + 3);
+      refOscillator.connect(refGain);
+      refGain.connect(refCtx.destination);
+      refOscillator.start();
+      refOscillator.stop(refCtx.currentTime + 3.1);
+      refOscillator.onended = () => { stopReference(); };
+
+      playingRefIndex = i;
+      document.querySelectorAll('.ref-btn').forEach((b, j) => b.classList.toggle('playing', j === i));
+
+      // Auto-stop
+      setTimeout(() => {
+        if (playingRefIndex === i) stopReference();
+      }, 3200);
+    }
+
+    function stopReference() {
+      if (refOscillator) { try { refOscillator.stop(); } catch(e){} refOscillator = null; }
+      playingRefIndex = -1;
+      document.querySelectorAll('.ref-btn').forEach(b => b.classList.remove('playing'));
+    }
+
+    // ─── PWA INSTALL ──────────────────────────────────────────────
+    let deferredPrompt = null;
+    const installBanner = document.getElementById('install-banner');
+
+    window.addEventListener('beforeinstallprompt', e => {
+      e.preventDefault();
+      deferredPrompt = e;
+      installBanner.style.display = 'block';
+    });
+
+    installBanner.addEventListener('click', async () => {
+      if (!deferredPrompt) return;
+      deferredPrompt.prompt();
+      const { outcome } = await deferredPrompt.userChoice;
+      deferredPrompt = null;
+      installBanner.style.display = 'none';
+    });
+
+    // ─── SERVICE WORKER ───────────────────────────────────────────
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('sw.js').catch(() => {});
+    }
+  </script>
+</body>
+</html>
